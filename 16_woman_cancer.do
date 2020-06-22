@@ -9,6 +9,28 @@
 gen w_papsmear = .
 gen w_mammogram = .
 
+
+if inlist(name,"Bolivia2008") {
+	replace w_papsmear = s254
+	replace w_papsmear = . if s254 == 8
+	replace w_papsmear=. if v012 < 20
+}
+
+if inlist(name,"DominicanRepublic2007") {
+	replace w_papsmear = s1008a
+	replace w_papsmear = . if s1008a == 9
+	replace w_papsmear=. if v012 < 20
+}
+
+if inlist(name,"Colombia2010") {
+	replace w_papsmear = s904
+	replace w_papsmear = . if s904 == 9
+	replace w_papsmear=. if v012 < 20
+	replace w_mammogram = s938
+	replace w_mammogram = . if s938 == 9
+	replace w_mammogram=. if v012 < 20
+}
+
 capture confirm variable s714dd s714ee 
 if _rc==0 {
     replace w_papsmear=1 if s714dd==1 & s714ee==1
@@ -52,13 +74,31 @@ if _rc==0 {
 gen w_mammogram_ref = ""  //use string in the list: "1yr","2yr","5yr","ever"; or missing as ""
 gen w_papsmear_ref = ""   //use string in the list: "1yr","2yr","3yr","5yr","ever"; or missing as ""
 
+if inlist(name, "Bolivia2008") {
+	replace w_papsmear_ref = "3yr"
+}
+if inlist(name, "DominicanRepublic2007") {
+	replace w_papsmear_ref = "1yr"
+}
+if inlist(name, "Colombia2010") {
+	replace w_papsmear_ref = "ever"
+	replace w_mammogram_ref = "ever"
+}
 * Add Age Group.
 //if not in adeptfile, please generate value, otherwise keep it missing. 
 
 gen w_mammogram_age = "" //use string in the list: "20-49","20-59"; or missing as ""
 gen w_papsmear_age = ""  //use string in the list: "40-49","20-59"; or missing as ""
 
-
-
+if inlist(name, "Bolivia2008") {
+	replace w_papsmear_age = "20-49"
+}
+if inlist(name, "DominicanRepublic2007") {
+	replace w_papsmear_age = "20-49"
+}
+if inlist(name, "Colombia2010") {
+	replace w_papsmear_age = "20-49"
+	replace w_mammogram_age = "20-49"
+}
 
 
