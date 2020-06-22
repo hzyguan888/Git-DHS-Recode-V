@@ -39,20 +39,20 @@ global DO "${root}/STATA/DO/SC/DHS/Recode V/Git-DHS-Recode-V"
 do "${DO}/0_GLOBAL.do"
 //$DHScountries_Recode_V
 
-foreach name in Albania2008 {	
+foreach name in $DHScountries_Recode_V {	
 
-tempfile birth ind men hm hiv hh zsc zsc_hm zsc_birth iso 
+tempfile birth ind men hm hiv hh zsc iso 
 
 ************************************
 ***domains using zsc data***********
 ************************************
-capture confirm file "${SOURCE}/DHS/DHS-`name'/DHS-`name'zsc.dta"	
+capture confirm file "${SOURCE}/DHS-`name'/DHS-`name'zsc.dta"	
 if _rc == 0 {
-    use "${SOURCE}/DHS/DHS-`name'/DHS-`name'zsc.dta", clear
+    use "${SOURCE}/DHS-`name'/DHS-`name'zsc.dta", clear
     if hwlevel == 2 {
 		gen caseid = hwcaseid
 		gen bidx = hwline   	  
-		merge 1:1 caseid bidx using `birth'
+		merge 1:1 caseid bidx using "${SOURCE}/DHS-`name'/DHS-`name'birth.dta"
     	gen ant_sampleweight = v005/10e6  
     	drop if _!=3
 		
@@ -68,12 +68,12 @@ if _rc == 0 {
  		replace c_underweight=0 if hc71>=-2 & hc71!=.
 		
 		rename ant_sampleweight c_ant_sampleweight
-		keep c_* caseid bidx
+		keep c_* caseid bidx hwlevel
 		save "${INTER}/zsc_birth.dta",replace
     }
 
  	if hwlevel == 1 {
- 		use "${SOURCE}/DHS/DHS-`name'/DHS-`name'zsc.dta", clear
+ 		use "${SOURCE}/DHS-`name'/DHS-`name'zsc.dta", clear
  		gen hhid = hwhhid
  		gen hvidx = hwline
  		merge 1:1 hhid hvidx using "${SOURCE}/DHS-`name'/DHS-`name'hm.dta", keepusing(hv103 hv001 hv002 hv005)
@@ -94,7 +94,7 @@ if _rc == 0 {
  		replace c_underweight=0 if hc71>=-2 & hc71!=.
 	    
 		rename ant_sampleweight c_ant_sampleweight
-		keep c_* hhid hvidx
+		keep c_* hhid hvidx hc70 hc71
 		save "${INTER}/zsc_hm.dta",replace
     }
 
@@ -174,7 +174,7 @@ use "${SOURCE}/DHS-`name'/DHS-`name'hm.dta", clear
 gen name = "`name'"
     do "${DO}/13_adult"
     do "${DO}/14_demographics"
-	
+
 capture confirm file "${INTER}/zsc_hm.dta"
     if _rc != 0 {
     do "${DO}/9_child_anthropometrics" 
@@ -185,14 +185,14 @@ capture confirm file "${INTER}/zsc_hm.dta"
 	merge 1:1 hhid hvidx using "${INTER}/zsc_hm.dta"
 
 	}
-	
+
 keep hv001 hv002 hvidx hc70 hc71 ///
 c_* a_* hm_* ln 
 save `hm'
 
-capture confirm file "${SOURCE}/DHS/DHS-`name'/DHS-`name'hiv.dta"
+capture confirm file "${SOURCE}/DHS-`name'/DHS-`name'hiv.dta"
  	if _rc==0 {
-    use "${SOURCE}/DHS/DHS-`name'/DHS-`name'hiv.dta", clear
+    use "${SOURCE}/DHS-`name'/DHS-`name'hiv.dta", clear
     do "${DO}/12_hiv"
  	}
  	if _rc!= 0 {
@@ -230,12 +230,18 @@ save `hh'
 ***match with external iso data
 use "${SOURCE}/external/iso", clear 
 keep country iso2c iso3c
+replace country = "Congodr"  if country == "Congo, the Democratic Republic of the"
+replace country = "DominicanRepublic"  if country == "Dominican Republic"
+
 save `iso'
 
 ***merge all subset of microdata
 use `hm',clear
 
     merge 1:m hv001 hv002 hvidx using `birth',update              //missing update is zero, non missing conflict for all matched.(hvidx different) 
+	
+	//bysort hv001 hv002: egen min = min(w_sampleweight)
+	//replace w_sampleweight = min if w_sampleweight ==.
     replace hm_headrel = 99 if _merge == 2
 	label define hm_headrel_lab 99 "dead/no longer in the household"
 	label values hm_headrel hm_headrel_lab
@@ -260,7 +266,10 @@ use `hm',clear
 *** Quality Control: Validate with DHS official data
 gen surveyid = iso2c+year+"DHS"
 gen name = "`name'"
-    
+	if inlist(name,"Eswatini2006") {
+		replace surveyid = "SZ2006DHS"
+	}
+
 preserve
 	do "${DO}/Quality_control"
 	save "${INTER}/quality_control-`name'",replace
@@ -290,7 +299,7 @@ preserve
     }
 	
 	***for variables generated from 8_child_illness	
-	foreach var of var c_ari	c_diarrhea 	c_diarrhea_hmf	c_diarrhea_medfor	c_diarrhea_mof	c_diarrhea_pro	c_diarrheaact ///
+	foreach var of var c_ari c_ari2	c_diarrhea 	c_diarrhea_hmf	c_diarrhea_medfor	c_diarrhea_mof	c_diarrhea_pro	c_diarrheaact ///
 	c_diarrheaact_q	c_fever	c_fevertreat	c_illness	c_illtreat	c_sevdiarrhea	c_sevdiarrheatreat ///
 	c_sevdiarrheatreat_q	c_treatARI c_treatARI2	c_treatdiarrhea	c_diarrhea_med {
     replace `var' = . if !inrange(hm_age_mon,0,59)
@@ -316,7 +325,7 @@ preserve
     do "${DO}/Label_var" 
 	
 *** Clean the intermediate data
-    capture confirm file "${INTER}/zsc_hm.dta"
+    capture confirm file "${INTER}/zsc_birth.dta"
     if _rc == 0 {
     erase "${INTER}/zsc_birth.dta"
     }	
