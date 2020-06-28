@@ -68,12 +68,11 @@ if _rc == 0 {
  		replace c_underweight=0 if hc71>=-2 & hc71!=.
 		
 		rename ant_sampleweight c_ant_sampleweight
-		keep c_* caseid bidx hwlevel
+		keep c_* caseid bidx hwlevel hc70 hc71
 		save "${INTER}/zsc_birth.dta",replace
     }
 
  	if hwlevel == 1 {
- 		use "${SOURCE}/DHS-`name'/DHS-`name'zsc.dta", clear
  		gen hhid = hwhhid
  		gen hvidx = hwline
  		merge 1:1 hhid hvidx using "${SOURCE}/DHS-`name'/DHS-`name'hm.dta", keepusing(hv103 hv001 hv002 hv005)
@@ -118,7 +117,8 @@ use "${SOURCE}/DHS-`name'/DHS-`name'birth.dta", clear
 	
 	capture confirm file "${INTER}/zsc_birth.dta"
 	if _rc == 0 {
-	merge 1:1 caseid bidx using "${INTER}/zsc_birth.dta"
+	merge 1:1 caseid bidx using "${INTER}/zsc_birth.dta",nogen
+	rename (hc70 hc71) (c_hc70 c_hc71)
     }
 	
 *housekeeping for birthdata
@@ -176,18 +176,21 @@ gen name = "`name'"
     do "${DO}/14_demographics"
 
 capture confirm file "${INTER}/zsc_hm.dta"
-    if _rc != 0 {
-    do "${DO}/9_child_anthropometrics" 
-	rename ant_sampleweight c_ant_sampleweight
-    }	
-	
 	if _rc == 0 {
-	merge 1:1 hhid hvidx using "${INTER}/zsc_hm.dta"
-
+	merge 1:1 hhid hvidx using "${INTER}/zsc_hm.dta",nogen
+	rename (hc70 hc71) (hm_hc70 hm_hc71)
 	}
+	if _rc != 0 {
+	  capture confirm file "${INTER}/zsc_birth.dta"
+	    if _rc != 0 {
+          do "${DO}/9_child_anthropometrics"  //if there's no zsc related file, then run 9_child_anthropometrics
+	      rename ant_sampleweight c_ant_sampleweight
+		}
+    }	
 
-keep hv001 hv002 hvidx hc70 hc71 ///
-c_* a_* hm_* ln 
+gen c_placeholder = 1
+keep hv001 hv002 hvidx ///
+c_* a_* hm_* ln *hc70 *hc71
 save `hm'
 
 capture confirm file "${SOURCE}/DHS-`name'/DHS-`name'hiv.dta"
@@ -199,7 +202,7 @@ capture confirm file "${SOURCE}/DHS-`name'/DHS-`name'hiv.dta"
     gen a_hiv = . 
     gen a_hiv_sampleweight = .
     }  
-keep a_hiv* hv001 hv002 hvidx
+keep a_hiv* hv001 hv002 hvidx 
 save `hiv'
 
 use `hm',clear
@@ -239,7 +242,7 @@ save `iso'
 use `hm',clear
 
     merge 1:m hv001 hv002 hvidx using `birth',update              //missing update is zero, non missing conflict for all matched.(hvidx different) 
-	
+
 	//bysort hv001 hv002: egen min = min(w_sampleweight)
 	//replace w_sampleweight = min if w_sampleweight ==.
     replace hm_headrel = 99 if _merge == 2
@@ -248,10 +251,23 @@ use `hm',clear
 	replace hm_live = 0 if _merge == 2 | inlist(hm_headrel,.,12,98)
 	drop _merge
     merge m:m hv001 hv002 hvidx using `ind',nogen update
-	merge m:m hv001 hv002       using `hh',nogen update
+	merge m:m  hv001 hv002       using `hh',nogen update
     
-	rename c_ant_sampleweight ant_sampleweight
     tab hh_urban,mi  //check whether all hh member + dead child + child lives outside hh assinged hh info
+
+capture confirm variable c_hc70 c_hc71 
+if _rc == 0 {
+rename (c_hc70 c_hc71 ) (hc70 hc71 )
+}
+
+capture confirm variable hm_hc70 hm_hc71 
+if _rc == 0 {
+rename (hm_hc70 hm_hc71 ) (hc70 hc71 )
+}
+
+rename c_ant_sampleweight ant_sampleweight
+drop c_placeholder
+
 
 ***survey level data
     gen survey = "DHS-`name'"
@@ -306,7 +322,7 @@ preserve
     }
 	
 	***for vriables generated from 9_child_anthropometrics
-	foreach var of var c_underweight c_stunted	hc70 hc71 ant_sampleweight{
+	foreach var of var c_underweight c_stunted ant_sampleweight hc70 hc71 {
     replace `var' = . if !inrange(hm_age_mon,0,59)
     }
 	
