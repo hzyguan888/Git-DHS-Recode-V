@@ -31,6 +31,23 @@ if inlist(name,"Colombia2010") {
 	replace w_mammogram=. if v012 < 20
 }
 
+if inlist(name,"Honduras2005") {
+	replace w_mammogram = s1021
+	replace w_mammogram = . if s1021 == 9
+	replace w_mammogram=. if v012 < 20
+}
+
+if inlist(name,"Jordan2007") {
+	replace w_papsmear=(s550d==1)
+	replace w_papsmear=. if s550c==.
+	replace w_papsmear=. if v012 < 20
+	replace w_mammogram=(s550b==1)
+	replace w_mammogram=. if s550b==.|s550b==8
+	replace w_mammogram=. if v012 < 20
+}
+
+
+
 capture confirm variable s714dd s714ee 
 if _rc==0 {
     replace w_papsmear=1 if s714dd==1 & s714ee==1
@@ -84,6 +101,12 @@ if inlist(name, "Colombia2010") {
 	replace w_papsmear_ref = "ever"
 	replace w_mammogram_ref = "ever"
 }
+if inlist(name, "Jordan2017") {
+	replace w_papsmear_ref = "ever"
+	replace w_mammogram_ref = "1yr"
+}
+
+
 * Add Age Group.
 //if not in adeptfile, please generate value, otherwise keep it missing. 
 
@@ -100,5 +123,8 @@ if inlist(name, "Colombia2010") {
 	replace w_papsmear_age = "20-49"
 	replace w_mammogram_age = "20-49"
 }
-
+if inlist(name, "Jordan2017") {
+	replace w_papsmear_age = "20-49"
+	replace w_mammogram_age = "20-49"
+}
 
