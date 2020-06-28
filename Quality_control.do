@@ -9,6 +9,7 @@ could be adjusted later */
 use "${SOURCE}/external/DHS.dta", clear
 replace surveyid = "DO2007DHS" if surveyid == "DR2007DHS"
 replace surveyid = "HT2005DHS" if surveyid == "HT2006DHS"
+replace surveyid = "IN2005DHS" if surveyid == "IA2006DHS"
 save "C:\Users\Guan\OneDrive\DHS\MEASURE UHC DATA/RAW DATA/Recode V/external/DHS.dta", replace
 */
 
@@ -90,21 +91,26 @@ c_ari2 c_diarrhea 	c_diarrhea_hmf	c_diarrhea_mof c_fever	c_treatdiarrhea c_treat
 
 gen ispreferred = "1"   //there are dif. definition for same indicator in DHS data. 
 
-*indicators calculate using ant_samplewieght (child sample weight = women sample weight)
+*indicators calculate using w_sampleweight (child sample weight = women sample weight)
 foreach var of var c_anc c_anc_bp_q	c_anc_bs_q c_anc_ear c_anc_ir c_anc_ski c_anc_tet c_anc_ur_q c_caesarean c_earlybreast c_sba  ///
 c_bcg	c_dpt1	c_dpt2	c_dpt3	c_fullimm	c_measles	c_polio1	c_polio2	c_polio3		///
 c_ari2 c_diarrhea 	c_diarrhea_hmf	c_diarrhea_mof	c_fever c_treatARI2 c_treatdiarrhea  {
 egen value_my`var' = wtmean(`var'), weight(w_sampleweight)
 }  
 
-*indicators calculate using ant_samplewieght (women sample weight)
+*indicators calculate using w_sampleweight (women sample weight)
 foreach var of var w_CPR w_need_fp w_unmet_fp w_metany_fp w_metmod_fp w_bmi_1549 w_obese_1549 w_overweight_1549 {
 egen value_my`var' = wtmean(`var'), weight(w_sampleweight)
 }  
 
 *indicators calculate using household sample weight
-foreach var of var c_underweight c_stunted	c_ITN {
+foreach var of var c_ITN {
 egen value_my`var' = wtmean(`var'), weight(hh_sampleweight)
+}
+
+*indicators using ant_sampleweight
+foreach var of var c_underweight c_stunted{    
+egen value_my`var' = wtmean(`var'), weight(ant_sampleweight)
 }
 
 keep surveyid ispreferred value*
@@ -155,10 +161,10 @@ The bidx is nt used in the hefpi indicator caluclation
 	}
 	
 	***for women, reference population differs.
-    if inlist(name,"Armenia2010"){
+
     replace w_papsmear=. if hm_age_yrs<20|hm_age_yrs>49
-	replace w_mammogram=. if  hm_age_yrs<40|hm_age_yrs>49
-	}	
+	replace w_mammogram=. if  hm_age_yrs<20|hm_age_yrs>49
+	
 
 ***for variables generated from 4_sexual_health 5_woman_anthropometrics
 	foreach var of var w_CPR w_unmet_fp	w_need_fp w_metany_fp	w_metmod_fp w_metany_fp_q  w_bmi_1549 w_height_1549 w_obese_1549 w_overweight_1549 {
@@ -198,16 +204,20 @@ The bidx is nt used in the hefpi indicator caluclation
 *********************************
 *indicators calculate using w_samplewieght (women sample weight)
 foreach var of var w_CPR w_bmi_1549 w_condom_conc w_height_1549 w_mammogram w_obese_1549 ///
-w_overweight_1549 w_papsmear w_unmet_fp c_anc	c_fullimm c_measles c_sba c_stunted c_treatARI2	///
+w_overweight_1549 w_papsmear w_unmet_fp c_anc	c_fullimm c_measles c_sba c_treatARI2	///
 c_treatdiarrhea	{
 egen value_my`var' = wtmean(`var'), weight(w_sampleweight)
 }   
 
 *indicator caculate at adult level (using individual sample weight）
-foreach var of var a_bp_dial a_bp_sys a_bp_treat a_diab_treat c_ITN c_underweight {
+foreach var of var a_bp_dial a_bp_sys a_bp_treat a_diab_treat c_ITN {
 egen value_my`var' = wtmean(`var'),weight(hh_sampleweight)
 }
 
+*indicator caculate for child_anthropometrics (using ant_sampleweight）
+foreach var of var c_underweight c_stunted {
+egen value_my`var' = wtmean(`var'),weight(ant_sampleweight)
+}
 
 keep surveyid value*
 keep if _n == 1
